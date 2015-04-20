@@ -11,7 +11,6 @@ import android.opengl.Matrix;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
-import java.nio.ShortBuffer;
 
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
@@ -20,9 +19,10 @@ public class MyRenderer implements GLSurfaceView.Renderer {
 
     private int shaderProgram = -1;
 
-    private FloatBuffer vertexBuffer;
-    private ShortBuffer drawListBuffer;
-    private short[] drawOrder;
+    private FloatBuffer verticesCoordBuffer;
+    private FloatBuffer textureCoordBuffer;
+    private int nVertices;
+    private int textureDataHandle;
 
     private Context context;
 
@@ -34,7 +34,59 @@ public class MyRenderer implements GLSurfaceView.Renderer {
     private float q3 = 0;
 
     public MyRenderer(Context context) {
+
         this.context = context;
+
+        float vertexCoords[] = {
+                //Front face
+                0f,0f,1f,   1f,0f,1f,   1f,1f,1f,
+                0f,0f,1f,   1f,1f,1f,   0f,1f,1f,
+                // Back face
+                0f,0f,0f,   1f,1f,0f,   1f,0f,0f,
+                0f,0f,0f,   0f,1f,0f,   1f,1f,0f,
+                // Top face
+                0f,1f,1f,   1f,1f,1f,   0f,1f,0f,
+                0f,1f,0f,   1f,1f,1f,   1f,1f,0f,
+                // Bottom face
+                0f,0f,1f,   0f,0f,0f,   1f,0f,1f,
+                1f,0f,1f,   0f,0f,0f,   1f,0f,0f,
+                // Left face
+                0f,0f,1f,   0f,1f,1f,   0f,0f,0f,
+                0f,0f,0f,   0f,1f,1f,   0f,1f,0f,
+                // Right face
+                1f,0f,1f,   1f,0f,0f,   1f,1f,1f,
+                1f,0f,0f,   1f,1f,0f,   1f,1f,1f
+        };
+
+        float textureCoords[] = {
+                // Front face
+                0f,0f,   1f,0f,   1f,1f,
+                0f,0f,   1f,1f,   0f,1f,
+                // Back face
+                1f,0f,   0f,1f,   0f,0f,
+                1f,0f,   1f,1f,   0f,1f,
+                //Top face
+                0f,0f,   1f,0f,   0f,1f,
+                0f,1f,   1f,0f,   1f,1f,
+                // Bottom face
+                0f,1f,   0f,0f,   1f,1f,
+                1f,1f,   0f,0f,   1f,0f,
+                //Left face
+                1f,0f,   1f,1f,   0f,0f,
+                0f,0f,   1f,1f,   0f,1f,
+                // Right face
+                0f,0f,   1f,0f,   0f,1f,
+                1f,0f,   1f,1f,   0f,1f
+        };
+
+        verticesCoordBuffer = ByteBuffer.allocateDirect(vertexCoords.length*4).order(ByteOrder.nativeOrder()).asFloatBuffer();
+        verticesCoordBuffer.put(vertexCoords).position(0);
+
+        nVertices = vertexCoords.length;
+
+        textureCoordBuffer = ByteBuffer.allocateDirect(textureCoords.length*4).order(ByteOrder.nativeOrder()).asFloatBuffer();
+        textureCoordBuffer.put(textureCoords).position(0);
+
     }
 
     @Override
@@ -48,17 +100,21 @@ public class MyRenderer implements GLSurfaceView.Renderer {
         GLES20.glDepthMask( true );
 
         String vertexShaderString =
-                "attribute vec4 vWorldCoord;" +
-                "uniform mat4 mProjection;" +
-                "uniform mat4 mModelView;" +
+                "attribute vec4 a_vWorldCoord;" +
+                "attribute vec2 a_vTexCoord;" +
+                "uniform mat4 u_mProjection;" +
+                "uniform mat4 u_mModelView;" +
+                "varying vec2 v_vTexCoord;" +
                 "void main()" +
                 "{" +
-                    "gl_Position = mProjection * (mModelView * vWorldCoord);" +
+                    "v_vTexCoord = a_vTexCoord;" +
+                    "gl_Position = u_mProjection * (u_mModelView * a_vWorldCoord);" +
                 "}";
         String fragmentShaderString =
-                "uniform vec4 vColor;" +
+                "uniform sampler2D u_texture;" +
+                "varying vec2 v_vTexCoord;" +
                 "void main() {" +
-                    "gl_FragColor = vColor;" +
+                    "gl_FragColor = texture2D(u_texture, v_vTexCoord);" +
                 "}";
 
         int vertexShader = GLES20.glCreateShader(GLES20.GL_VERTEX_SHADER);
@@ -72,45 +128,13 @@ public class MyRenderer implements GLSurfaceView.Renderer {
         shaderProgram = GLES20.glCreateProgram();
         GLES20.glAttachShader(shaderProgram, vertexShader);
         GLES20.glAttachShader(shaderProgram, fragmentShader);
+
+        GLES20.glBindAttribLocation(shaderProgram, 0, "a_vWorldCoord");
+        GLES20.glBindAttribLocation(shaderProgram, 1, "a_vTexCoord");
+
         GLES20.glLinkProgram(shaderProgram);
 
-        float squareCoords[] = {
-                0.0f, 0.0f, 0.0f,
-                0.0f, 0.0f, 1.0f,
-                0.0f, 1.0f, 0.0f,
-                0.0f, 1.0f, 1.0f,
-                1.0f, 0.0f, 0.0f,
-                1.0f, 0.0f, 1.0f,
-                1.0f, 1.0f, 0.0f,
-                1.0f, 1.0f, 1.0f};
-
-        float textureCoords[] = {0.0f, 0.0f, 0.0f,
-                0.0f, 0.0f, 1.0f,
-                0.0f, 1.0f, 0.0f,
-                0.0f, 1.0f, 1.0f,
-                1.0f, 0.0f, 0.0f,
-                1.0f, 0.0f, 1.0f,
-                1.0f, 1.0f, 0.0f,
-                1.0f, 1.0f, 1.0f};
-
-        drawOrder = new short[]{0, 1, 2, 2, 1, 3,
-                5, 1, 7, 7, 1, 3,
-                6, 7, 2, 2, 7, 3,
-                0, 4, 2, 2, 4, 6,
-                4, 5, 6, 6, 5, 7,
-                0, 4, 1, 1, 4, 5};
-
-        ByteBuffer bb = ByteBuffer.allocateDirect(squareCoords.length*4);
-        bb.order(ByteOrder.nativeOrder());
-        vertexBuffer = bb.asFloatBuffer();
-        vertexBuffer.put(squareCoords);
-        vertexBuffer.position(0);
-
-        ByteBuffer dbb = ByteBuffer.allocateDirect(drawOrder.length*2);
-        dbb.order(ByteOrder.nativeOrder());
-        drawListBuffer = dbb.asShortBuffer();
-        drawListBuffer.put(drawOrder);
-        drawListBuffer.position(0);
+        textureDataHandle = loadTexture(R.drawable.bumpy_bricks_public_domain);
     }
 
     @Override
@@ -127,24 +151,36 @@ public class MyRenderer implements GLSurfaceView.Renderer {
 
         GLES20.glUseProgram(shaderProgram);
 
-        int vertHandle = GLES20.glGetAttribLocation(shaderProgram, "vWorldCoord");
+        int vertHandle = GLES20.glGetAttribLocation(shaderProgram, "a_vWorldCoord");
         GLES20.glEnableVertexAttribArray(vertHandle);
-        GLES20.glVertexAttribPointer(vertHandle, 3, GLES20.GL_FLOAT, false, 12, vertexBuffer);
+        verticesCoordBuffer.position(0);
+        GLES20.glVertexAttribPointer(vertHandle, 3, GLES20.GL_FLOAT, false, 12, verticesCoordBuffer);
 
-        int projHandle = GLES20.glGetUniformLocation(shaderProgram, "mProjection");
+        int textCoordHandle = GLES20.glGetAttribLocation(shaderProgram, "a_vTexCoord");
+        GLES20.glEnableVertexAttribArray(textCoordHandle);
+        textureCoordBuffer.position(0);
+        GLES20.glVertexAttribPointer(textCoordHandle, 2, GLES20.GL_FLOAT, false, 8, textureCoordBuffer);
+
+        int textureUniformHandle = GLES20.glGetUniformLocation(shaderProgram, "u_texture");
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureDataHandle);
+        GLES20.glUniform1i(textureUniformHandle, 0);
+
+        int projHandle = GLES20.glGetUniformLocation(shaderProgram, "u_mProjection");
         GLES20.glUniformMatrix4fv(projHandle, 1, false, projMat ,0);
 
-        int modelViewHandle = GLES20.glGetUniformLocation(shaderProgram, "mModelView");
+        int modelViewHandle = GLES20.glGetUniformLocation(shaderProgram, "u_mModelView");
         GLES20.glUniformMatrix4fv(modelViewHandle, 1, false , modelViewMat() ,0);
 
-        int colorHandle = GLES20.glGetUniformLocation(shaderProgram, "vColor");
+        //int colorHandle = GLES20.glGetUniformLocation(shaderProgram, "u_vColor");
 
-        for(int i=0;i<drawOrder.length/3;i++) {
-            drawListBuffer.position(3*i);
-            float x = ((float)i+1)/(drawOrder.length/3);
-            GLES20.glUniform4f(colorHandle, x, 1-x, 0.0f, 1.0f);
-            GLES20.glDrawElements(GLES20.GL_TRIANGLES, 3, GLES20.GL_UNSIGNED_SHORT, drawListBuffer);
-        }
+
+        //for(int i=0;i<nVertices/6;i++) {
+        //int i = 2;
+        //    float x = ((float)i+1)/(nVertices/6);
+        //    GLES20.glUniform4f(colorHandle, x, 1f-x, 0.0f, 1.0f);
+            GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 30, 6);
+        //}
 
 
         GLES20.glDisableVertexAttribArray(vertHandle);
@@ -171,17 +207,6 @@ public class MyRenderer implements GLSurfaceView.Renderer {
     }
 
     private float[] modelViewMat() {
-        //float[] rot1 = {(float)Math.cos(aZ), -(float)Math.sin(aZ), 0.0f,0.0f,  (float)Math.sin(aZ), (float)Math.cos(aZ), 0.0f, 0.0f,  0.0f, 0.0f, 1.0f, 0.0f,  0.0f, 0.0f, 0.0f, 1.0f};
-        //float[] rot2 = {(float)Math.cos(aY), 0.0f, (float)Math.sin(aY), 0.0f,  0.0f, 1.0f, 0.0f, 0.0f,  -(float)Math.sin(aY), 0.0f, (float)Math.cos(aY), 0.0f,  0.0f, 0.0f, 0.0f, 1.0f};
-        //float[] rot3 = {1.0f, 0.0f, 0.0f, 0.0f,  0.0f, (float) Math.cos(aX), -(float) Math.sin(aX), 0.0f, 0.0f, (float) Math.sin(aX), (float) Math.cos(aX), 0.0f,  0.0f, 0.0f, 0.0f, 1.0f};
-
-
-        //float[] rot12 = new float[16];
-        //float[] rot = quaternionToRotation();
-
-        //Matrix.multiplyMM(rot12, 0, rot1, 0, rot2, 0);
-        //Matrix.multiplyMM(rot, 0, rot12, 0, rot3, 0);
-
 
         float[] trans = new float[]{10.0f, 0.0f, 0.0f, 0.0f,  0.0f, 10.0f, 0.0f, 0.0f,  0.0f, 0.0f, 10.0f, 0.0f,  -5.0f, -5.0f, -5.0f, 1.0f};
 
