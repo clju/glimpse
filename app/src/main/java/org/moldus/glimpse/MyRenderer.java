@@ -1,9 +1,11 @@
 package org.moldus.glimpse;
 
 import android.content.Context;
+import android.database.Cursor;
 import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
 import android.opengl.Matrix;
+import android.provider.MediaStore;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -34,16 +36,18 @@ public class MyRenderer implements GLSurfaceView.Renderer {
 
         this.context = context;
 
+        // Create vertex + texture coord arrays
         float vertexCoords[] = {
                 0f,-0.5f,-0.5f,   0f,0.5f,-0.5f,   0f,0.5f,0.5f,
                 0f,-0.5f,-0.5f,   0f,0.5f, 0.5f,   0f,-0.5f,0.5f
         };
 
         float textureCoords[] = {
-                1f,1f,   1f,0f,   0f,0f,
-                1f,1f,   0f,0f,   0f,1f
+                0f,1f,   1f,1f,   1f,0f,
+                0f,1f,   1f,0f,   0f,0f
         };
 
+        // Create buffers
         verticesCoordBuffer = ByteBuffer.allocateDirect(vertexCoords.length*4).order(ByteOrder.nativeOrder()).asFloatBuffer();
         verticesCoordBuffer.put(vertexCoords).position(0);
 
@@ -98,9 +102,21 @@ public class MyRenderer implements GLSurfaceView.Renderer {
 
         GLES20.glLinkProgram(pictureShader);
 
-        for(int i=0;i<10;i++) {
-            pictures.add(new Pic(R.drawable.bumpy_bricks_public_domain, i*2*Math.PI/10, context));
+
+        // Load pictures
+        String[] projection = {MediaStore.Images.Media.DATA, MediaStore.Images.Media.DATE_TAKEN};
+        Cursor recentPicturesCursor = context.getContentResolver().query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI ,projection, null, null, MediaStore.Images.Media.DATE_TAKEN+" desc limit 10");
+        if(recentPicturesCursor != null) {
+            recentPicturesCursor.moveToFirst();
+            int i = 0;
+            do {
+                String photoFilePath = recentPicturesCursor.getString(recentPicturesCursor.getColumnIndex(MediaStore.Images.Media.DATA) );
+                pictures.add(new Pic(photoFilePath, 2*i*Math.PI/10));
+                recentPicturesCursor.moveToNext();
+                i++;
+            } while(! recentPicturesCursor.isAfterLast());
         }
+
     }
 
     @Override
@@ -116,12 +132,12 @@ public class MyRenderer implements GLSurfaceView.Renderer {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
 
         for(Pic p:pictures) {
-            drawPicture(p.angle, p.textureDataHandle);
+            drawPicture(p.textureDataHandle, p.transfMatrix, p.angle);
         }
 
     }
 
-    public void drawPicture(double angle, int textureDataHandle) {
+    public void drawPicture(int textureDataHandle, float[] transfMatrix, double angle) {
 
         // Use shader of pictures
         GLES20.glUseProgram(pictureShader);
@@ -144,11 +160,16 @@ public class MyRenderer implements GLSurfaceView.Renderer {
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureDataHandle);
         GLES20.glUniform1i(textureUniformHandle, 0);
 
-        // Load model matrix into shader
+        // Compute model matrix & load it into shader
         float[] mModel = new float[16];
-        float[] trans = new float[]{1f,0f,0f,0f,   0f,1f,0f,0f,   0f,0f,1f,0f,   -5f,0f,0f,1f};
+        float[] m = new float[16];
+
+        float[] trans = new float[]{1f,0f,0f,0f,   0f,1f,0f,0f,   0f,0f,1f,0f,   -3f,0f,0f,1f};
+        Matrix.multiplyMM(m, 0, trans, 0, transfMatrix, 0);
+
         float[] rot = new float[]{(float)Math.cos(angle),(float)Math.sin(angle),0f,0f,   -(float)Math.sin(angle),(float)Math.cos(angle),0f,0f,   0f,0f,1f,0f,   0f,0f,0f,1f};
-        Matrix.multiplyMM(mModel,0,rot,0,trans,0);
+        Matrix.multiplyMM(mModel,0,rot,0,m,0);
+
         int modelHandle = GLES20.glGetUniformLocation(pictureShader, "u_mModel");
         GLES20.glUniformMatrix4fv(modelHandle, 1, false , mModel ,0);
 

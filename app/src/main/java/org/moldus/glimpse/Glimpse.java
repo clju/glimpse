@@ -11,7 +11,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 
 
-public class MainActivity extends ActionBarActivity {
+public class Glimpse extends ActionBarActivity {
 
     private SensorManager sensorManager;
     private Sensor rotationSensor;
@@ -39,7 +39,7 @@ public class MainActivity extends ActionBarActivity {
             public void onAccuracyChanged(Sensor sensor, int accuracy) {
 
             }
-        }, rotationSensor, SensorManager.SENSOR_DELAY_FASTEST);
+        }, rotationSensor, SensorManager.SENSOR_DELAY_UI);
 
     }
 
