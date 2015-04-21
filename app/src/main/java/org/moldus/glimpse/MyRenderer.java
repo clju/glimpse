@@ -5,6 +5,7 @@ import android.hardware.Camera;
 import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
 import android.opengl.Matrix;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -36,6 +37,10 @@ public class MyRenderer implements GLSurfaceView.Renderer {
     public android.hardware.Camera camera;
     private boolean updateTexture = false;
     public boolean changePreview = false;
+    public boolean showPreview = true;
+
+    private float ratio;
+    private float hViewAngle = (float)(Math.PI/3);
 
     public MyRenderer() {
 
@@ -64,10 +69,15 @@ public class MyRenderer implements GLSurfaceView.Renderer {
 
         GLES20.glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
+        // Depth
         GLES20.glClearDepthf(1.0f);
         GLES20.glEnable( GLES20.GL_DEPTH_TEST );
         GLES20.glDepthFunc( GLES20.GL_LEQUAL );
         GLES20.glDepthMask( true );
+
+        // Blend
+        //GLES20.glEnable(GLES20.GL_BLEND);
+        //GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA);
 
         String previewVertexShaderString =
                 "#version 100\n" +
@@ -120,8 +130,9 @@ public class MyRenderer implements GLSurfaceView.Renderer {
     public void onSurfaceChanged(GL10 gl, int width, int height) {
 
         GLES20.glViewport(0, 0, width, height);
-        float ratio = (float) width / height;
-        Matrix.frustumM(projMat, 0, -ratio, ratio, -1, 1, 1, 20);
+        float r = (float) width / height;
+        Matrix.frustumM(projMat, 0, -r, r, -1, 1, 1, 20);
+
 
         Camera.Parameters param = camera.getParameters();
         List<Camera.Size> psize = param.getSupportedPreviewSizes();
@@ -138,6 +149,11 @@ public class MyRenderer implements GLSurfaceView.Renderer {
         }
         param.set("orientation", "portrait");
         camera.setParameters(param);
+
+        Camera.Size size = camera.getParameters().getPreviewSize();
+        ratio = ((float)size.width)/size.height;
+        hViewAngle = (float)(Math.PI/180*camera.getParameters().getHorizontalViewAngle()/ratio);
+
         camera.startPreview();
     }
 
@@ -158,9 +174,16 @@ public class MyRenderer implements GLSurfaceView.Renderer {
 
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
 
-        for(Pic p:pictures) {
-            drawPreview(p);
+        // "Frozen" preview
+        for(int i = 0;i<pictures.size()-1;i++) {
+            drawPreview(pictures.get(i));
         }
+
+        // Actual preview
+        if(showPreview) {
+            drawPreview(pictures.get(pictures.size()-1));
+        }
+
 
     }
 
@@ -188,7 +211,7 @@ public class MyRenderer implements GLSurfaceView.Renderer {
         GLES20.glUniform1i(textureUniformHandle, 0);
 
         // Compute model matrix & load it into shader
-        float[] trans = new float[]{1f,0f,0f,0f,   0f,1f,0f,0f,   0f,0f,1f,0f,   0f,0f,-3f,1f};
+        float[] trans = new float[]{1f,0f,0f,0f,   0f,ratio,0f,0f,   0f,0f,1f,0f,   0f,0f,-2/hViewAngle,1f};
         float[] model = new float[16];
 
         Matrix.multiplyMM(model, 0, p.rotationMatrix, 0, trans, 0);

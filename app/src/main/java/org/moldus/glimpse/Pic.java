@@ -3,7 +3,6 @@ package org.moldus.glimpse;
 import android.graphics.SurfaceTexture;
 import android.opengl.GLES20;
 
-
 public class Pic {
 
     public int textureDataHandle;

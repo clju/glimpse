@@ -14,8 +14,6 @@ import android.view.View;
 
 public class Glimpse extends ActionBarActivity {
 
-    private SensorManager sensorManager;
-    private Sensor rotationSensor;
     private MyRenderer renderer;
 
     @Override
@@ -31,8 +29,8 @@ public class Glimpse extends ActionBarActivity {
         setContentView(view);
 
         // Gets orientation sensor
-        sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
-        rotationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
+        SensorManager sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
+        Sensor rotationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
 
         // Registers listener for orientation sensor
         sensorManager.registerListener(new SensorEventListener() {
@@ -86,8 +84,18 @@ public class Glimpse extends ActionBarActivity {
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
-        renderer.changePreview = true;
-        return true;
+        if(keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+            renderer.changePreview = true;
+            return true;
+        }
+        else if(keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
+            renderer.showPreview = ! renderer.showPreview;
+            return true;
+        }
+        else {
+            return false;
+        }
+
     }
 
     @Override
