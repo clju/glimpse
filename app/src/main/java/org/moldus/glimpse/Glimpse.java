@@ -7,6 +7,7 @@ import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
+import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -15,6 +16,7 @@ public class Glimpse extends ActionBarActivity {
 
     private SensorManager sensorManager;
     private Sensor rotationSensor;
+    private MyRenderer renderer;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -22,15 +24,17 @@ public class Glimpse extends ActionBarActivity {
 
         // Creates view & renderer
         final MyGLSurfaceView view = new MyGLSurfaceView(this);
-        final MyRenderer renderer = new MyRenderer(this);
+        renderer = new MyRenderer();
         view.setRenderer(renderer);
 
         // Sets view
         setContentView(view);
 
+        // Gets orientation sensor
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         rotationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
 
+        // Registers listener for orientation sensor
         sensorManager.registerListener(new SensorEventListener() {
             @Override
             public void onSensorChanged(SensorEvent event) {
@@ -80,4 +84,19 @@ public class Glimpse extends ActionBarActivity {
                             | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);}
     }
 
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        renderer.changePreview = true;
+        return true;
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if(renderer.camera != null) {
+            renderer.camera.stopPreview();
+            renderer.camera.release();
+        }
+        finish();
+    }
 }
