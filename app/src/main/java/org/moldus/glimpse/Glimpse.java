@@ -5,6 +5,8 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.opengl.GLES20;
+import android.opengl.GLSurfaceView;
 import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
 import android.view.KeyEvent;
@@ -15,13 +17,14 @@ import android.view.View;
 public class Glimpse extends ActionBarActivity {
 
     private MyRenderer renderer;
+    private MyGLSurfaceView view;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
         // Creates view & renderer
-        final MyGLSurfaceView view = new MyGLSurfaceView(this);
+        view = new MyGLSurfaceView(this);
         renderer = new MyRenderer();
         view.setRenderer(renderer);
 
@@ -105,6 +108,8 @@ public class Glimpse extends ActionBarActivity {
             renderer.camera.stopPreview();
             renderer.camera.release();
         }
+
+        android.os.Process.killProcess(android.os.Process.myPid());
         finish();
     }
 }
